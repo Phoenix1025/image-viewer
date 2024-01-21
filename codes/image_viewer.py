@@ -2,6 +2,7 @@ import re
 import time
 import logging
 import webbrowser
+from pathlib import Path
 from datetime import date
 from tkinter import Tk, Label, Button, filedialog
 
@@ -11,7 +12,22 @@ from PIL import Image, ImageTk
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 
-from helper import get_folder_path, configure_logging, confirm, data_folder
+
+def is_image(file):
+    file = Path(file).absolute()
+    return file.is_file() and file.suffix.lower() in ('.jpg', 'jpeg', 'png')
+
+
+def view_image_location_on_map(coordinates):
+    lat, lon = coordinates
+    data_folder = Path('__file__').parents[1]
+    data_folder.mkdir(exist_ok=True)
+
+    gmap = gmplot.GoogleMapPlotter(lat, lon, 12)
+    gmap.marker(lat, lon, 'cornflowerblue')
+    gmap.draw(data_folder / 'location.html')
+
+    webbrowser.open(str(data_folder) + 'location.html')
 
 
 class ImageInfo:
@@ -82,76 +98,11 @@ class ImageInfo:
                 time.sleep(1)
 
 
-def is_image(file):
-    return file.is_file() and file.suffix.lower() in ('.jpg', 'jpeg', 'png')
-
-
-def view_on_map(coordinates):
-    lat, lon = coordinates
-    gmap = gmplot.GoogleMapPlotter(lat, lon, 12)
-    gmap.marker(lat, lon, 'cornflowerblue')
-    gmap.draw(data_folder / 'location.html')
-
-    webbrowser.open(str(data_folder) + 'location.html')
-
-
-def get_from_folder(folder):
-    image_files = [file for file in folder.rglob('*') if is_image(file)]
-    for file in image_files:
-        try:
-            image = ImageInfo(str(file))
-            logging.info(f'Current image file: {file}')
-            print(f'Date taken: {image.date_taken}')
-            print(f'Device make: {image.device_make}')
-            print(f'Device model: {image.device_model}')
-            print(f'Coordinates: {image.coordinates}')
-            print(f'address: {image.address}')
-        except FileNotFoundError as e:
-            logging.error(f'Skipping {file} error: {e}')
-            continue
-        except RuntimeError as e:
-            logging.error(f'Skipping {file} error: {e}')
-            continue
-
-
-def get_from_file(image_file):
-    if is_image(image_file):
-        try:
-            image = ImageInfo(str(image_file))
-            logging.info(f'Current image file: {image_file}')
-            print(f'Date taken: {image.date_taken}')
-            print(f'Device make: {image.device_make}')
-            print(f'Device model: {image.device_model}')
-            print(f'Coordinates: {image.coordinates}')
-            print(f'address: {image.address}')
-        except FileNotFoundError as e:
-            logging.error(f'Error {image_file}: {e}')
-        except RuntimeError as e:
-            logging.error(f'Error {image_file}: {e}')
-
-        if confirm('view location on map?'):
-            view_on_map(image.coordinates)
-
-
-def main():
-    configure_logging()
-    image_file = get_folder_path('file or folder you want to get image info.')
-
-    if image_file.is_dir():
-        get_from_folder(image_file)
-    else:
-        get_from_file(image_file)
-
-
-# if __name__ == '__main__':
-#     main()
-
-
 class ImageViewer:
     def __init__(self, master):
         self.master = master
-        self.master.geometry('250x250')
-        self.master.title("Image Viewer")
+        self.master.geometry('400x400')
+        self.master.title("My Image Viewer")
 
         self.image_path = None
         self.image = None
@@ -163,21 +114,26 @@ class ImageViewer:
 
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
-        if file_path:
+        if is_image(file_path):
             self.image_path = file_path
-            self.display_image()
+        self.info = ImageInfo(self.image_path)
+        self.display_image()
 
     def display_image(self):
         if self.image_path:
             image = Image.open(self.image_path)
-            # Resize the image to fit the window
-            image = image.resize((400, 400), Image.Resampling.LANCZOS)
+            # TODO: image should retain its aspect ratio, impliment logic to view infos in app.
+            image = image.resize((300, 300), Image.Resampling.LANCZOS)
             self.image = ImageTk.PhotoImage(image)
             self.image_label.config(image=self.image)
             self.image_label.image = self.image
+            print(f'date taken: {self.info.date_taken}')
+            print(f'coordinates: {self.info.coordinates}')
+            print(f'make of device took: {self.info.device_make}')
+            print(f'model of device took: {self.info.device_model}')
+            print(f'address where image was taken: {self.info.address}')
 
 
 if __name__ == "__main__":
-    root = Tk()
-    app = ImageViewer(root)
-    root.mainloop()
+    app = ImageViewer(Tk())
+    app.master.mainloop()
