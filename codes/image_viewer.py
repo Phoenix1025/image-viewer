@@ -1,4 +1,3 @@
-import logging
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog
@@ -7,41 +6,47 @@ import ttkbootstrap as ttk
 from PIL import Image, ImageTk
 
 from image_info import ImageInfo
-
-
-def configure_logging(*, log_level=logging.ERROR, log_file=None):
-    log_handlers = [logging.StreamHandler()]
-    if log_file is not None:
-        log_handlers = [logging.FileHandler(log_file, mode='w')]
-
-    logging.basicConfig(
-        level=log_level,
-        handlers=log_handlers,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+from configs import configure_logging
 
 
 class InfoWindow(tk.Toplevel):
-    def __init__(self, image_info, master=None):
+    def __init__(self, image_info, info_needed, master=None):
         super().__init__(master)
-        self.title("Image Info")
+        self.title(info_needed)
         self.geometry('300x150')
 
         self.image_info = image_info
+        self.info_needed = info_needed
 
         self.create_widgets()
 
     def create_widgets(self):
-        info_text = f"""
-        Date Taken: {self.image_info.date_taken}
-        Coordinates: {self.image_info.coordinates}
-        Device Make: {self.image_info.device_make}
-        Device Model: {self.image_info.device_model}
-        Address: {self.image_info.address}
-        """
+        info_text = {
+            "Date taken": f"{self.image_info.date_taken}",
+            "Location": f"""
+                Coordinates:
+                {self.image_info.coordinates}
+                Address:
+                {self.image_info.address}""",
+            "Device used": f"""
+                Make: {self.image_info.device_make}
+                Model: {self.image_info.device_model}"""
+        }.get(self.info_needed)
 
-        info_label = tk.Label(self, text=info_text, justify=tk.LEFT, pady=10)
+        view_map_frame = tk.Frame(self)
+        view_map_frame.pack(side='bottom')
+
+        info_label = tk.Label(self, text=info_text, justify=tk.LEFT)
         info_label.pack()
+
+        if self.info_needed == 'Location' and self.image_info.address is not None:
+            view_map_button = tk.Button(
+                view_map_frame,
+                text="view on map",
+                pady=5,
+                command=self.image_info.view_location_on_map
+            )
+            view_map_button.pack()
 
 
 class ImageViewer:
@@ -114,7 +119,11 @@ class ImageViewer:
             self.remove_info_menu()
 
         info_menu = tk.Menu(self.menu_bar, tearoff=0)
-        info_menu.add_command(label="Image Info", command=self.show_image_info)
+        info_menu.add_command(label="Date taken", command=lambda: self.show_image_info('Date taken'))
+        info_menu.add_separator()
+        info_menu.add_command(label="Location", command=lambda: self.show_image_info('Location'))
+        info_menu.add_separator()
+        info_menu.add_command(label="Device used", command=lambda: self.show_image_info('Device used'))
         self.menu_bar.add_cascade(label="Info", menu=info_menu)
 
         self.is_info_menu_open = True
@@ -153,8 +162,8 @@ class ImageViewer:
         about_text = "Image Viewer App\nVersion 1.0\n\n© 2024 Kirby Image Viewer App"
         tk.messagebox.showinfo("About", about_text)
 
-    def show_image_info(self):
-        info_window = InfoWindow(self.image_info, self.master)
+    def show_image_info(self, info_needed):
+        info_window = InfoWindow(self.image_info, info_needed, self.master)
         info_window.mainloop()
 
     def load_image(self):
