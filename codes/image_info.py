@@ -11,18 +11,6 @@ from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 
 
-def view_image_location_on_map(coordinates):
-    latitude, longitude = coordinates
-    data_folder = Path('__file__').parents[1] / 'logs'
-    data_folder.mkdir(exist_ok=True)
-
-    gmap = gmplot.GoogleMapPlotter(latitude, longitude, 12)
-    gmap.marker(latitude, longitude, 'cornflowerblue')
-    gmap.draw(str(data_folder) + 'location.html')
-
-    webbrowser.open(str(data_folder) + 'location.html')
-
-
 class ImageInfo:
     def __init__(self, image_path):
         self.image_path = image_path
@@ -90,3 +78,14 @@ class ImageInfo:
                 return None
             finally:
                 time.sleep(1)
+
+    def view_location_on_map(self):
+        latitude, longitude = self.coordinates
+        data_folder = Path(__file__).parents[1] / 'logs'
+        data_folder.mkdir(exist_ok=True)
+
+        gmap = gmplot.GoogleMapPlotter(latitude, longitude, 12)
+        gmap.marker(latitude, longitude, 'cornflowerblue')
+        gmap.draw(data_folder / 'location.html')
+
+        webbrowser.open(data_folder / 'location.html')
