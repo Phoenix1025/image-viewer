@@ -81,7 +81,7 @@ class ImageInfo:
 
     def view_location_on_map(self):
         latitude, longitude = self.coordinates
-        data_folder = Path(__file__).parents[1] / 'logs'
+        data_folder = Path(__file__).parents[1] / 'data'
         data_folder.mkdir(exist_ok=True)
 
         gmap = gmplot.GoogleMapPlotter(latitude, longitude, 12)
