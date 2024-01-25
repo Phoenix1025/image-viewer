@@ -1,19 +1,12 @@
-import re
-import time
 import logging
-import webbrowser
 import tkinter as tk
 from pathlib import Path
-from datetime import date
 from tkinter import filedialog
 
 import ttkbootstrap as ttk
-
-import pyexiv2
-from gmplot import gmplot
 from PIL import Image, ImageTk
-from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+
+from image_info import ImageInfo
 
 
 def configure_logging(*, log_level=logging.ERROR, log_file=None):
@@ -28,85 +21,27 @@ def configure_logging(*, log_level=logging.ERROR, log_file=None):
     )
 
 
-def view_image_location_on_map(coordinates):
-    latitude, longitude = coordinates
-    data_folder = Path('__file__').parents[1] / 'logs'
-    data_folder.mkdir(exist_ok=True)
+class InfoWindow(tk.Toplevel):
+    def __init__(self, image_info, master=None):
+        super().__init__(master)
+        self.title("Image Info")
+        self.geometry('300x150')
 
-    gmap = gmplot.GoogleMapPlotter(latitude, longitude, 12)
-    gmap.marker(latitude, longitude, 'cornflowerblue')
-    gmap.draw(str(data_folder) + 'location.html')
+        self.image_info = image_info
 
-    webbrowser.open(str(data_folder) + 'location.html')
+        self.create_widgets()
 
+    def create_widgets(self):
+        info_text = f"""
+        Date Taken: {self.image_info.date_taken}
+        Coordinates: {self.image_info.coordinates}
+        Device Make: {self.image_info.device_make}
+        Device Model: {self.image_info.device_model}
+        Address: {self.image_info.address}
+        """
 
-class ImageInfo:
-    def __init__(self, image_path):
-        self.image_path = image_path
-        self.get_metadata()
-
-    def get_metadata(self):
-        with open(self.image_path, 'rb') as f:
-            with pyexiv2.ImageData(f.read()) as image_info:
-                self.metadata = image_info.read_exif()
-
-    @property
-    def device_model(self):
-        return self.metadata.get('Exif.Image.Model')
-
-    @property
-    def device_make(self):
-        return self.metadata.get('Exif.Image.Make')
-
-    @property
-    def date_taken(self):
-        date_taken = self.metadata.get('Exif.Image.DateTime')
-        if date_taken is None:
-            return
-        if not any(char.isalpha() for char in date_taken):
-            try:
-                date_taken = re.split(r'\s+|[:]', date_taken)
-                year, month, day, *_ = [int(num) for num in date_taken]
-                return date(year, month, day).strftime('%B %d, %Y')
-            except ValueError:
-                date_taken = int(date_taken[0]) / 1000
-                return date.fromtimestamp(date_taken).strftime('%B %d, %Y')
-        else:
-            year, month, day, *_ = time.strptime(re.findall(r'\w+\s+\d+[,]\s+\d+', date_taken)[0], '%b %d, %Y')
-            return date(year, month, day).strftime('%B %d, %Y')
-
-    @property
-    def coordinates(self):
-        if 'Exif.GPSInfo.GPSLatitude' in self.metadata:
-            latitude_data = self.metadata['Exif.GPSInfo.GPSLatitude']
-            longitude_data = self.metadata['Exif.GPSInfo.GPSLongitude']
-
-            latitude = [eval(values) for values in latitude_data.split()]
-            latitude_deg = latitude[0] + latitude[1] / 60 + latitude[2] / 3600
-            longitude = [eval(values) for values in longitude_data.split()]
-            longitude_deg = longitude[0] + longitude[1] / 60 + longitude[2] / 3600
-
-            return latitude_deg, longitude_deg
-
-    @property
-    def address(self):
-        if self.coordinates:
-            latitude, longitude = self.coordinates
-            geolocator = Nominatim(user_agent="image_locator")
-            try:
-                location = geolocator.reverse((latitude, longitude), language='en')
-                return location.address
-            except GeocoderTimedOut:
-                logging.error("Geocoding service timed out.")
-                return None
-            except GeocoderUnavailable:
-                logging.error("Geocoding service unavailable.")
-                return None
-            except Exception as e:
-                logging.error(f"Error during geocoding: {e}")
-                return None
-            finally:
-                time.sleep(1)
+        info_label = tk.Label(self, text=info_text, justify=tk.LEFT, pady=10)
+        info_label.pack()
 
 
 class ImageViewer:
@@ -115,48 +50,146 @@ class ImageViewer:
         self.master.geometry('500x550')
         self.master.title("Image Viewer")
 
-        self.image_path = None
-        self.image = None
-        # widgets
-        self.load_button = ttk.Button(self.master, text="Open Image", command=self.load_image)
-        self.info_textbox = tk.Text(self.master, wrap="word", height=5, width=40)
         self.image_label = ttk.Label(self.master)
-        # layout
-        self.load_button.pack()
-        self.info_textbox.pack()
-        self.image_label.pack()
+        self.image_label.pack(pady=5)
+
+        self.info_menu = None
+        self.is_info_menu_open = False
+
+        self.configure_ui()
+
+    def configure_ui(self):
+        # Menu bar
+        self.menu_bar = tk.Menu(self.master)
+        self.master.config(menu=self.menu_bar)
+
+        # File menu
+        file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        file_menu.add_command(label="Open Image", command=self.load_image)
+        file_menu.add_separator()
+        file_menu.add_command(label="Exit", command=self.master.destroy)
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
+
+        # View menu
+        view_menu = tk.Menu(self.menu_bar, tearoff=0)
+        view_menu.add_command(label="Full Screen", command=self.toggle_fullscreen)
+        self.menu_bar.add_cascade(label="View", menu=view_menu)
+
+        # Help menu
+        help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        help_menu.add_command(label="About", command=self.show_about_dialog)
+        self.menu_bar.add_cascade(label="Help", menu=help_menu)
+
+        # Navigation bar
+        self.nav_frame = ttk.Frame(self.master)
+        self.nav_frame.pack(side='bottom', fill='x')
+
+        # Navigation Buttons
+        self.prev_button = tk.Button(self.nav_frame, text="Previous", command=self.show_previous_image)
+        self.next_button = tk.Button(self.nav_frame, text="Next", command=self.show_next_image)
+
+        # Status bar
+        self.status_bar = ttk.Label(self.master, text="", anchor=tk.W)
+        self.status_bar.pack(side="bottom")
+
+        # Keyboard shortcuts
+        self.master.bind("<Left>", lambda event: self.show_previous_image())
+        self.master.bind("<Right>", lambda event: self.show_next_image())
+        self.master.bind("<F11>", lambda event: self.toggle_fullscreen())
+
+    @property
+    def image_path(self):
+        self.current_index = max(0, min(self.current_index, len(self.image_list) - 1))
+        return self.image_list[self.current_index]
+
+    @property
+    def image_info(self):
+        return ImageInfo(self.image_path)
+
+    def is_image(self, file):
+        return file.is_file() and file.suffix in ('.png', '.jpg', '.jpeg', '.gif')
+
+    def add_info_menu(self):
+        if self.is_info_menu_open:
+            self.remove_info_menu()
+
+        info_menu = tk.Menu(self.menu_bar, tearoff=0)
+        info_menu.add_command(label="Image Info", command=self.show_image_info)
+        self.menu_bar.add_cascade(label="Info", menu=info_menu)
+
+        self.is_info_menu_open = True
+        self.info_menu = info_menu
+
+    def remove_info_menu(self):
+        if self.info_menu:
+            self.menu_bar.delete("Info")
+            self.is_info_menu_open = False
+            self.info_menu = None
+
+    def show_previous_image(self):
+        self.current_index -= 1
+        self.display_image()
+
+    def show_next_image(self):
+        self.current_index += 1
+        self.display_image()
+
+    def show_nav_buttons(self):
+        self.prev_button.pack(side='left', padx=5)
+        self.next_button.pack(side='right', padx=5)
+
+    def update_nav_button_state(self):
+        self.prev_button.config(state=tk.NORMAL if self.current_index > 0 else tk.DISABLED)
+        self.next_button.config(state=tk.NORMAL if self.current_index < len(self.image_list) - 1 else tk.DISABLED)
+
+    def update_status_bar(self):
+        status_text = f"Image {self.current_index + 1} of {len(self.image_list)}"
+        self.status_bar.config(text=status_text)
+
+    def toggle_fullscreen(self):
+        self.master.attributes("-fullscreen", not self.master.attributes("-fullscreen"))
+
+    def show_about_dialog(self):
+        about_text = "Image Viewer App\nVersion 1.0\n\n© 2024 Kirby Image Viewer App"
+        tk.messagebox.showinfo("About", about_text)
+
+    def show_image_info(self):
+        info_window = InfoWindow(self.image_info, self.master)
+        info_window.mainloop()
 
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
         if file_path:
-            self.image_path = file_path
-            self.info = ImageInfo(self.image_path)
+            file_path = Path(file_path)
+            self.image_folder = file_path.parent
+            self.image_list = [file for file in self.image_folder.iterdir() if self.is_image(file)]
+            self.current_index = self.image_list.index(file_path)
             self.display_image()
-
-    def resize(self, image):
-        original_width, original_height = image.size
-        aspect_ratio = original_width / original_height
-        new_height = int(150 / aspect_ratio)
-        image = image.resize((150, new_height), Image.Resampling.LANCZOS)
-
-        return image
 
     def display_image(self):
         if self.image_path:
             image = Image.open(self.image_path)
-            image = self.resize(image)
+            image = self.resize_image(image)
             self.image = ImageTk.PhotoImage(image)
             self.image_label.config(image=self.image)
+            self.update_status_bar()
+            self.update_nav_button_state()
+            self.show_nav_buttons()
+            self.add_info_menu()
 
-            info_text = (
-                f'date taken: {self.info.date_taken}\n'
-                f'coordinates: {self.info.coordinates}\n'
-                f'make of device took: {self.info.device_make}\n'
-                f'model of device took: {self.info.device_model}\n'
-                f'address where image was taken: {self.info.address}'
-            )
-            self.info_textbox.delete(1.0, "end")  # Clear previous text
-            self.info_textbox.insert("end", info_text)
+    def resize_image(self, image, desired_width=450):
+        original_width, original_height = image.size
+        aspect_ratio = original_width / original_height
+        # Calculate the new dimensions while preserving the aspect ratio
+        if aspect_ratio > 1:  # Landscape image
+            new_width = desired_width
+            new_height = int(desired_width / aspect_ratio)
+        else:  # Portrait or square image
+            new_width = int(desired_width * aspect_ratio)
+            new_height = desired_width
+
+        resized_image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        return resized_image
 
 
 if __name__ == "__main__":
