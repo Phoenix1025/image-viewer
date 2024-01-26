@@ -51,6 +51,8 @@ class InfoWindow(ttk.Toplevel):
 
 
 class ImageViewer:
+    IMAGE_FILES = ('.png', '.jpg', '.jpeg', '.gif')
+
     def __init__(self, master):
         self.master = master
         self.master.geometry('500x550')
@@ -114,7 +116,7 @@ class ImageViewer:
         return ImageInfo(self.image_path)
 
     def is_image(self, file):
-        return file.is_file() and file.suffix.lower() in ('.png', '.jpg', '.jpeg', '.gif')
+        return file.is_file() and file.suffix.lower() in self.IMAGE_FILES
 
     def add_info_menu(self):
         if self.is_info_menu_open:
@@ -140,14 +142,12 @@ class ImageViewer:
     def show_previous_image(self):
         self.current_index -= 1
         self.display_image()
-        if self.info_window.is_open:
-            self.info_window.destroy()
+        self.close_info_window()
 
     def show_next_image(self):
         self.current_index += 1
         self.display_image()
-        if self.info_window.is_open:
-            self.info_window.destroy()
+        self.close_info_window()
 
     def show_nav_buttons(self):
         self.prev_button.pack(side='left', padx=5)
@@ -173,6 +173,10 @@ class ImageViewer:
         self.info_window.is_open = True
         self.info_window.mainloop()
 
+    def close_info_window(self):
+        if self.info_window and self.info_window.is_open:
+            self.info_window.destroy()
+
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
         if file_path:
@@ -181,8 +185,7 @@ class ImageViewer:
             self.image_list = [file for file in self.image_folder.glob("*") if self.is_image(file)]
             self.current_index = self.image_list.index(file_path)
             self.display_image()
-            if self.info_window and self.info_window.is_open:
-                self.info_window.destroy()
+            self.close_info_window()
 
     def display_image(self):
         if self.image_path:
