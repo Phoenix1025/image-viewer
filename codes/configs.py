@@ -1,4 +1,11 @@
 import logging
+from pathlib import Path
+
+data_folder = Path(__file__).parents[1] / 'data'
+data_folder.mkdir(exist_ok=True)
+
+logs_folder = Path(__file__).parents[1] / 'logs'
+logs_folder.mkdir(exist_ok=True)
 
 
 def configure_logging(*, log_level=logging.ERROR, log_file=None):

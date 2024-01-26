@@ -2,13 +2,14 @@ import re
 import time
 import logging
 import webbrowser
-from pathlib import Path
 from datetime import date
 
 import pyexiv2
 from gmplot import gmplot
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
+
+from configs import data_folder
 
 
 class ImageInfo:
@@ -81,8 +82,6 @@ class ImageInfo:
 
     def view_location_on_map(self):
         latitude, longitude = self.coordinates
-        data_folder = Path(__file__).parents[1] / 'data'
-        data_folder.mkdir(exist_ok=True)
 
         gmap = gmplot.GoogleMapPlotter(latitude, longitude, 12)
         gmap.marker(latitude, longitude, 'cornflowerblue')

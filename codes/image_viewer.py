@@ -6,7 +6,9 @@ import ttkbootstrap as ttk
 from PIL import Image, ImageTk
 
 from image_info import ImageInfo
-from configs import configure_logging
+from configs import configure_logging, logs_folder
+
+LOG_FILE = logs_folder / "logs.txt"
 
 
 class InfoWindow(ttk.Toplevel):
