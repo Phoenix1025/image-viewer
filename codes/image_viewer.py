@@ -9,7 +9,7 @@ from image_info import ImageInfo
 from configs import configure_logging
 
 
-class InfoWindow(tk.Toplevel):
+class InfoWindow(ttk.Toplevel):
     def __init__(self, image_info, info_needed, master=None):
         super().__init__(master)
         self.title(info_needed)
@@ -34,14 +34,14 @@ class InfoWindow(tk.Toplevel):
                 Model: {self.image_info.device_model}"""
         }.get(self.info_needed)
 
-        view_map_frame = tk.Frame(self)
+        view_map_frame = ttk.Frame(self)
         view_map_frame.pack(side='bottom')
 
-        info_label = tk.Label(self, text=info_text, justify=tk.LEFT)
+        info_label = ttk.Label(self, text=info_text, justify=ttk.LEFT)
         info_label.pack()
 
         if self.info_needed == 'Location' and self.image_info.address is not None:
-            view_map_button = tk.Button(
+            view_map_button = ttk.Button(
                 view_map_frame,
                 text="view on map",
                 pady=5,
