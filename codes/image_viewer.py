@@ -112,7 +112,7 @@ class ImageViewer:
         return ImageInfo(self.image_path)
 
     def is_image(self, file):
-        return file.is_file() and file.suffix in ('.png', '.jpg', '.jpeg', '.gif')
+        return file.is_file() and file.suffix.lower() in ('.png', '.jpg', '.jpeg', '.gif')
 
     def add_info_menu(self):
         if self.is_info_menu_open:
@@ -171,7 +171,7 @@ class ImageViewer:
         if file_path:
             file_path = Path(file_path)
             self.image_folder = file_path.parent
-            self.image_list = [file for file in self.image_folder.iterdir() if self.is_image(file)]
+            self.image_list = [file for file in self.image_folder.glob("*") if self.is_image(file)]
             self.current_index = self.image_list.index(file_path)
             self.display_image()
 

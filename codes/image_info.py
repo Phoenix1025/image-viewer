@@ -68,13 +68,13 @@ class ImageInfo:
                 location = geolocator.reverse((latitude, longitude), language='en')
                 return location.address
             except GeocoderTimedOut:
-                logging.error("Geocoding service timed out.")
+                logging.error(f"Image {self.image_path}: Geocoding service timed out.")
                 return None
             except GeocoderUnavailable:
-                logging.error("Geocoding service unavailable.")
+                logging.error(f"Image {self.image_path}: Geocoding service unavailable.")
                 return None
             except Exception as e:
-                logging.error(f"Error during geocoding: {e}")
+                logging.error(f"Image {self.image_path}: Error during geocoding: {e}")
                 return None
             finally:
                 time.sleep(1)
