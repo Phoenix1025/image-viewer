@@ -17,6 +17,7 @@ class InfoWindow(tk.Toplevel):
 
         self.image_info = image_info
         self.info_needed = info_needed
+        self.is_open = False
 
         self.create_widgets()
 
@@ -59,6 +60,7 @@ class ImageViewer:
         self.image_label.pack(pady=5)
 
         self.info_menu = None
+        self.info_window = None
         self.is_info_menu_open = False
 
         self.configure_ui()
@@ -138,10 +140,14 @@ class ImageViewer:
     def show_previous_image(self):
         self.current_index -= 1
         self.display_image()
+        if self.info_window.is_open:
+            self.info_window.destroy()
 
     def show_next_image(self):
         self.current_index += 1
         self.display_image()
+        if self.info_window.is_open:
+            self.info_window.destroy()
 
     def show_nav_buttons(self):
         self.prev_button.pack(side='left', padx=5)
@@ -163,8 +169,9 @@ class ImageViewer:
         tk.messagebox.showinfo("About", about_text)
 
     def show_image_info(self, info_needed):
-        info_window = InfoWindow(self.image_info, info_needed, self.master)
-        info_window.mainloop()
+        self.info_window = InfoWindow(self.image_info, info_needed, self.master)
+        self.info_window.is_open = True
+        self.info_window.mainloop()
 
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
@@ -174,6 +181,8 @@ class ImageViewer:
             self.image_list = [file for file in self.image_folder.glob("*") if self.is_image(file)]
             self.current_index = self.image_list.index(file_path)
             self.display_image()
+            if self.info_window and self.info_window.is_open:
+                self.info_window.destroy()
 
     def display_image(self):
         if self.image_path:
