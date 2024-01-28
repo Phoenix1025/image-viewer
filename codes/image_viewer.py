@@ -15,7 +15,7 @@ class InfoWindow(ttk.Toplevel):
     def __init__(self, image_info, info_needed, master=None):
         super().__init__(master)
         self.title(info_needed)
-        self.geometry('300x150')
+        self.geometry('300x150' if info_needed == 'Location' and image_info.address else '200x100')
 
         self.image_info = image_info
         self.info_needed = info_needed
@@ -25,43 +25,39 @@ class InfoWindow(ttk.Toplevel):
 
     def create_widgets(self):
         info_text = {
-            "Date taken": f"{self.image_info.date_taken}",
-            "Location": f"""
-                Coordinates:
-                {self.image_info.coordinates}
-                Address:
-                {self.image_info.address}""",
-            "Device used": f"""
-                Make: {self.image_info.device_make}
-                Model: {self.image_info.device_model}"""
-        }.get(self.info_needed)
+            "Date taken": f"Date: {self.image_info.date}\nTime: {self.image_info.time}",
+            "Location": f"Coordinates: {self.image_info.coordinates}\nAddress: {self.image_info.address}",
+            "Device used": f"Make: {self.image_info.device_make}\nModel: {self.image_info.device_model}"
+        }.get(self.info_needed, "")
 
         view_map_frame = ttk.Frame(self)
         view_map_frame.pack(side='bottom')
 
-        info_label = ttk.Label(self, text=info_text, justify=ttk.LEFT)
-        info_label.pack()
+        info_text_widget = ttk.Text(self, wrap=ttk.WORD, width=40, height=8)
+        info_text_widget.insert(ttk.END, info_text)
+        info_text_widget.config(state=ttk.DISABLED)
+        info_text_widget.pack()
 
-        if self.info_needed == 'Location' and self.image_info.address is not None:
+        if self.info_needed == 'Location' and self.image_info.address:
             view_map_button = ttk.Button(
                 view_map_frame,
-                text="view on map",
-                pady=5,
+                text="View on map",
+                style="TButton",
                 command=self.image_info.view_location_on_map
             )
             view_map_button.pack()
 
 
 class ImageViewer:
-    IMAGE_FILES = ('.png', '.jpg', '.jpeg', '.gif')
+    IMAGE_FILES = ('.png', '.jpg', '.jpeg', '.gif', '.bmp')
 
     def __init__(self, master):
         self.master = master
         self.master.geometry('500x550')
-        self.master.title("Image Viewer")
+        self.master.title("Kirby Image Viewer")
 
         self.image_label = ttk.Label(self.master)
-        self.image_label.pack(pady=5)
+        self.image_label.pack()
 
         self.info_menu = None
         self.info_window = None
@@ -171,6 +167,7 @@ class ImageViewer:
         tk.messagebox.showinfo("About", about_text)
 
     def show_image_info(self, info_needed):
+        self.close_info_window()
         self.info_window = InfoWindow(self.image_info, info_needed, self.master)
         self.info_window.is_open = True
         self.info_window.mainloop()
@@ -200,7 +197,9 @@ class ImageViewer:
             self.show_nav_buttons()
             self.add_info_menu()
 
-    def resize_image(self, image, desired_width=450):
+    def resize_image(self, image, desired_width=None):
+        if desired_width is None:
+            desired_width = self.master.winfo_width()
         original_width, original_height = image.size
         aspect_ratio = original_width / original_height
         # Calculate the new dimensions while preserving the aspect ratio
