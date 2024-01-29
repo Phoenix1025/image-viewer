@@ -6,16 +6,20 @@ import ttkbootstrap as ttk
 from PIL import Image, ImageTk
 
 from image_info import ImageInfo
-from configs import configure_logging, logs_folder
+from configs import logs_folder, configure_logging, logger
 
 LOG_FILE = logs_folder / "logs.txt"
+
+MASTER_SIZE = '500x550'
+INFO_WINDOW_SIZE = '300x150'
+INFO_WINDOW_ALT_SIZE = '200x100'
 
 
 class InfoWindow(ttk.Toplevel):
     def __init__(self, image_info, info_needed, master=None):
         super().__init__(master)
         self.title(info_needed)
-        self.geometry('300x150' if info_needed == 'Location' and image_info.address else '200x100')
+        self.geometry(INFO_WINDOW_SIZE if info_needed == 'Location' and image_info.address else INFO_WINDOW_ALT_SIZE)
 
         self.image_info = image_info
         self.info_needed = info_needed
@@ -53,39 +57,40 @@ class ImageViewer:
 
     def __init__(self, master):
         self.master = master
-        self.master.geometry('500x550')
+        self.master.geometry(MASTER_SIZE)
+
         self.master.title("Kirby Image Viewer")
 
         self.image_label = ttk.Label(self.master)
         self.image_label.pack()
 
+        self.image_folder = None
+        self.image_list = []
+        self.current_index = 0
         self.info_menu = None
         self.info_window = None
         self.is_info_menu_open = False
 
-        self.configure_ui()
-
-    def configure_ui(self):
         # Menu bar
         self.menu_bar = tk.Menu(self.master)
         self.master.config(menu=self.menu_bar)
 
         # File menu
-        file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        file_menu.add_command(label="Open Image", command=self.load_image)
-        file_menu.add_separator()
-        file_menu.add_command(label="Exit", command=self.master.destroy)
-        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.file_menu.add_command(label="Open Image", command=self.load_image)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", command=self.master.destroy)
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         # View menu
-        view_menu = tk.Menu(self.menu_bar, tearoff=0)
-        view_menu.add_command(label="Full Screen", command=self.toggle_fullscreen)
-        self.menu_bar.add_cascade(label="View", menu=view_menu)
+        self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.view_menu.add_command(label="Full Screen", command=self.toggle_fullscreen)
+        self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         # Help menu
-        help_menu = tk.Menu(self.menu_bar, tearoff=0)
-        help_menu.add_command(label="About", command=self.show_about_dialog)
-        self.menu_bar.add_cascade(label="Help", menu=help_menu)
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.help_menu.add_command(label="About", command=self.show_about_dialog)
+        self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         # Navigation bar
         self.nav_frame = ttk.Frame(self.master)
@@ -107,7 +112,10 @@ class ImageViewer:
     @property
     def image_path(self):
         self.current_index = max(0, min(self.current_index, len(self.image_list) - 1))
-        return self.image_list[self.current_index]
+        try:
+            return self.image_list[self.current_index]
+        except IndexError:
+            logger.error('Image list is empty.')
 
     @property
     def image_info(self):
@@ -160,7 +168,14 @@ class ImageViewer:
         self.status_bar.config(text=status_text)
 
     def toggle_fullscreen(self):
-        self.master.attributes("-fullscreen", not self.master.attributes("-fullscreen"))
+        current_state = self.master.attributes("-fullscreen")
+        next_state = not current_state
+
+        label_text = "Exit Full Screen" if not current_state else "Full Screen"
+        self.view_menu.entryconfig(0, label=label_text)
+        self.master.attributes("-fullscreen", next_state)
+        if self.image_path:
+            self.display_image()
 
     def show_about_dialog(self):
         about_text = "Image Viewer App\nVersion 1.0\n\n© 2024 Kirby Image Viewer App"
@@ -178,31 +193,35 @@ class ImageViewer:
 
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.png;*.jpg;*.jpeg;*.gif;*.bmp")])
-        if file_path:
-            file_path = Path(file_path)
-            self.image_folder = file_path.parent
-            self.image_list = [file for file in self.image_folder.glob("*") if self.is_image(file)]
-            self.current_index = self.image_list.index(file_path)
-            self.display_image()
-            self.close_info_window()
+        if not file_path:
+            return
+        file_path = Path(file_path)
+        self.image_folder = file_path.parent
+        self.image_list = [file for file in self.image_folder.glob("*") if self.is_image(file)]
+        self.current_index = self.image_list.index(file_path)
+        self.display_image()
+        self.close_info_window()
 
     def display_image(self):
-        if self.image_path:
+        try:
             image = Image.open(self.image_path)
-            image = self.resize_image(image)
-            self.image = ImageTk.PhotoImage(image)
-            self.image_label.config(image=self.image)
-            self.update_status_bar()
-            self.update_nav_button_state()
-            self.show_nav_buttons()
-            self.add_info_menu()
+        except (IOError, OSError) as e:
+            logger.error(f'Error opening image: {e}')
+            return
+        image = self.resize_image(image)
+        self.image = ImageTk.PhotoImage(image)
+        self.image_label.config(image=self.image)
+        self.update_status_bar()
+        self.update_nav_button_state()
+        self.show_nav_buttons()
+        self.add_info_menu()
 
     def resize_image(self, image, desired_width=None):
         if desired_width is None:
             desired_width = self.master.winfo_width()
         original_width, original_height = image.size
         aspect_ratio = original_width / original_height
-        # Calculate the new dimensions while preserving the aspect ratio
+
         if aspect_ratio > 1:  # Landscape image
             new_width = desired_width
             new_height = int(desired_width / aspect_ratio)
