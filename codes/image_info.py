@@ -112,8 +112,12 @@ if __name__ == '__main__':
         img_info = ImageInfo(test_path)
         print(img_info.metadata)
         print()
-        print(img_info.image_path, 'date taken:', img_info.date, img_info.time)
-        print(f'{img_info.image_path} coordinates: {img_info.coordinates}')
+        print(img_info.image_path)
+        print(f'date: {img_info.date}')
+        print(f'time: {img_info.time}')
+        print(f'coordinates: {img_info.coordinates}')
+        print(f'device make: {img_info.device_make}')
+        print(f'device model: {img_info.device_model}')
 
     def folder_test(test_path):
         image_files = ('.png', '.jpg', '.jpeg', '.gif')
@@ -130,5 +134,5 @@ if __name__ == '__main__':
     test_file_2 = 'C:/Users/KENNETH/Pictures/OPPO_a37f/Maureen/Camera/C360_2017-04-01-18-57-18-788.jpg'  # exif key
     test_file_3 = 'C:/Users/KENNETH/Pictures/OPPO_a37f/Maureen/Camera/IMG_20170408_145205.jpg'  # no metadata
     test_file_4 = 'C:/Users/KENNETH/Desktop/Test Folder/Image files/jpg files/picture 24.jpg'  # no datetime info
-    test_file_5 = 'C:/Users/KENNETH/Desktop/Test Folder/Image files/jpg files/1544228043189.jpg'
-    individual_test(test_file_1)
+    test_file_5 = 'C:/Users/KENNETH/Desktop/Test Folder/Image files/jpg files/1544228043189.jpg'  # 'Dec 8, 2018 8:14:03 AM'
+    # individual_test(test_file_5)
